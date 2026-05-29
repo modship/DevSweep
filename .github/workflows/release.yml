@@ -94,20 +94,18 @@ jobs:
       # config's beforeBuildCommand) and produces the platform installers:
       # .dmg / .app.tar.gz (macOS), .msi / setup .exe (Windows),
       # .AppImage / .deb / .rpm (Linux).
+      # Unsigned build (no Apple Developer account). The app still runs; macOS
+      # users open it the first time via right-click → Open, or:
+      #   xattr -dr com.apple.quarantine /Applications/DevSweep.app
+      #
+      # To enable macOS code signing + notarization later, add an `env:` block
+      # here with APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD,
+      # APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_PASSWORD and APPLE_TEAM_ID —
+      # tauri-action then signs, notarizes and staples automatically.
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS code signing + notarization. tauri-action signs, notarizes and
-          # staples automatically when these are set. Leave the secrets empty to
-          # produce an unsigned build (users will need to right-click → Open).
-          # Create them in: Settings → Secrets and variables → Actions.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           args: ${{ matrix.tauri-args }}
 
