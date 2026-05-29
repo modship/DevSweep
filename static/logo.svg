@@ -1,0 +1,42 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5b9bff"/>
+      <stop offset="1" stop-color="#2f6bd6"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bristle" x1="0" y1="0" x2="0" y2="1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dce8ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- App background -->
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="232" fill="url(#sheen)"/>
+
+  <!-- Sparkles -->
+  <path d="M712 222 C721.4 290.6 721.4 290.6 790 300 C721.4 309.4 721.4 309.4 712 378 C702.6 309.4 702.6 309.4 634 300 C702.6 290.6 702.6 290.6 712 222 Z" fill="#ffffff" opacity="0.95"/>
+  <path d="M664 404 C668.8 439.2 668.8 439.2 704 444 C668.8 448.8 668.8 448.8 664 484 C659.2 448.8 659.2 448.8 624 444 C659.2 439.2 659.2 439.2 664 404 Z" fill="#ffffff" opacity="0.8"/>
+
+  <!-- Broom -->
+  <g transform="rotate(-38 512 512)">
+    <!-- handle -->
+    <rect x="493" y="150" width="38" height="430" rx="19" fill="#ffffff"/>
+    <!-- ferrule -->
+    <rect x="470" y="556" width="84" height="52" rx="14" fill="#cdddff"/>
+    <!-- brush body -->
+    <path d="M478 606 H546 C560 606 572 615 576 629 L612 752 C616 766 606 780 591 780 H433 C418 780 408 766 412 752 L448 629 C452 615 464 606 478 606 Z" fill="url(#bristle)"/>
+    <!-- bristles -->
+    <g fill="url(#bristle)">
+      <rect x="428" y="760" width="22" height="96" rx="11" transform="rotate(-12 439 760)"/>
+      <rect x="470" y="766" width="22" height="104" rx="11" transform="rotate(-6 481 766)"/>
+      <rect x="501" y="768" width="22" height="108" rx="11"/>
+      <rect x="532" y="766" width="22" height="104" rx="11" transform="rotate(6 543 766)"/>
+      <rect x="574" y="760" width="22" height="96" rx="11" transform="rotate(12 585 760)"/>
+    </g>
+  </g>
+</svg>
