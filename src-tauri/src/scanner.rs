@@ -22,6 +22,8 @@ pub struct ArtifactInfo {
     pub name: String,
     pub kind: String,
     pub size: u64,
+    /// Newest file mtime inside the artifact, unix seconds. 0 = unknown.
+    pub modified: u64,
 }
 
 #[derive(Serialize, Clone)]
@@ -99,7 +101,7 @@ pub fn scan(root: &Path, app: &AppHandle) -> Result<Vec<ProjectInfo>, String> {
                 .artifacts
                 .par_iter()
                 .map(|a| {
-                    let size = dir_size(&a.path);
+                    let (size, modified) = dir_stats(&a.path);
                     let done = sized.fetch_add(1, Ordering::Relaxed) + 1;
                     let _ = app.emit(
                         "scan-progress",
@@ -114,6 +116,7 @@ pub fn scan(root: &Path, app: &AppHandle) -> Result<Vec<ProjectInfo>, String> {
                         name: a.name.clone(),
                         kind: a.kind.as_str().to_string(),
                         size,
+                        modified,
                     }
                 })
                 .filter(|a| a.size > 0)
@@ -221,16 +224,24 @@ fn is_hidden_skip(name: &str) -> bool {
     )
 }
 
-/// Sum of file sizes under `path`, in bytes. Follows no symlinks.
-pub(crate) fn dir_size(path: &Path) -> u64 {
+/// (total file size in bytes, newest file mtime in unix seconds) under
+/// `path`. Follows no symlinks. mtime is 0 when unreadable.
+pub(crate) fn dir_stats(path: &Path) -> (u64, u64) {
     WalkDir::new(path)
         .follow_links(false)
         .into_iter()
         .filter_map(|e| e.ok())
         .filter_map(|e| e.metadata().ok())
         .filter(|m| m.is_file())
-        .map(|m| m.len())
-        .sum()
+        .fold((0, 0), |(size, newest), m| {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            (size + m.len(), newest.max(mtime))
+        })
 }
 
 #[cfg(test)]
