@@ -15,6 +15,7 @@
   let rootPath = $state<string | null>(null);
   let progress = $state<ScanProgress | null>(null);
   let projects = $state<ProjectInfo[]>([]);
+  let tools = $state<ProjectInfo[]>([]);
   let disk = $state<DiskInfo | null>(null);
   let error = $state<string | null>(null);
 
@@ -32,13 +33,21 @@
   let unlisten: UnlistenFn | null = null;
 
   // ---- derived ----
+  let everything = $derived([...tools, ...projects]);
+
   let allLanguages = $derived(
-    [...new Set(projects.flatMap((p) => p.languages))].sort(),
+    [...new Set(everything.flatMap((p) => p.languages))].sort(),
   );
 
-  let filtered = $derived.by(() => {
+  const KIND_ORDER: ArtifactKind[] = ["dependencies", "build", "cache", "sdk", "simulator", "toolchain"];
+  let allKinds = $derived.by(() => {
+    const present = new Set(everything.flatMap((p) => p.artifacts.map((a) => a.kind)));
+    return KIND_ORDER.filter((k) => present.has(k));
+  });
+
+  function applyFilters(list: ProjectInfo[]): ProjectInfo[] {
     const q = search.trim().toLowerCase();
-    return projects
+    return list
       .map((p) => {
         const langOk =
           activeLanguages.size === 0 ||
@@ -57,23 +66,26 @@
         return { ...p, artifacts, totalSize };
       })
       .filter((p): p is ProjectInfo => p !== null);
-  });
+  }
+
+  let filtered = $derived.by(() => applyFilters(projects));
+  let filteredTools = $derived.by(() => applyFilters(tools));
 
   let totalReclaimable = $derived(
-    projects.reduce((s, p) => s + p.totalSize, 0),
+    everything.reduce((s, p) => s + p.totalSize, 0),
   );
   let totalArtifacts = $derived(
-    projects.reduce((s, p) => s + p.artifacts.length, 0),
+    everything.reduce((s, p) => s + p.artifacts.length, 0),
   );
 
   let allArtifactPaths = $derived(
-    new Map(projects.flatMap((p) => p.artifacts.map((a) => [a.path, a.size]))),
+    new Map(everything.flatMap((p) => p.artifacts.map((a) => [a.path, a.size]))),
   );
   let selectedSize = $derived(
     [...selected].reduce((s, path) => s + (allArtifactPaths.get(path) ?? 0), 0),
   );
   let visiblePaths = $derived(
-    filtered.flatMap((p) => p.artifacts.map((a) => a.path)),
+    [...filteredTools, ...filtered].flatMap((p) => p.artifacts.map((a) => a.path)),
   );
 
   // ---- disk context ----
@@ -105,10 +117,10 @@
   }
 
   async function runScan() {
-    if (!rootPath) return;
     error = null;
     cleanSummary = null;
     projects = [];
+    tools = [];
     selected.clear();
     activeLanguages.clear();
     activeKinds.clear();
@@ -116,7 +128,7 @@
     view = "scanning";
     disk = null;
 
-    invoke<DiskInfo>("disk_usage", { path: rootPath })
+    invoke<DiskInfo>("disk_usage", { path: rootPath ?? "/" })
       .then((d) => (disk = d))
       .catch(() => (disk = null));
 
@@ -126,7 +138,10 @@
     });
 
     try {
-      projects = await invoke<ProjectInfo[]>("scan_directory", { path: rootPath });
+      if (rootPath) {
+        projects = await invoke<ProjectInfo[]>("scan_directory", { path: rootPath });
+      }
+      tools = await invoke<ProjectInfo[]>("scan_tools");
       view = "results";
     } catch (e) {
       error = String(e);
@@ -157,7 +172,12 @@
     showConfirm = false;
     const paths = [...selected];
     if (paths.length === 0) return;
+    progress = { scanned: 0, current: "", phase: "cleaning" };
     view = "cleaning";
+    unlisten?.();
+    unlisten = await listen<ScanProgress>("scan-progress", (e) => {
+      progress = e.payload;
+    });
     let results: CleanResult[] = [];
     try {
       results = await invoke<CleanResult[]>("clean_paths", { paths });
@@ -165,6 +185,9 @@
       error = String(e);
       view = "results";
       return;
+    } finally {
+      unlisten?.();
+      unlisten = null;
     }
 
     const okPaths = new Set(results.filter((r) => r.success).map((r) => r.path));
@@ -172,12 +195,15 @@
     const failed = results.filter((r) => !r.success).length;
 
     // Remove cleaned artifacts from the model.
-    projects = projects
-      .map((p) => {
-        const artifacts = p.artifacts.filter((a) => !okPaths.has(a.path));
-        return { ...p, artifacts, totalSize: artifacts.reduce((s, a) => s + a.size, 0) };
-      })
-      .filter((p) => p.artifacts.length > 0);
+    const prune = (list: ProjectInfo[]) =>
+      list
+        .map((p) => {
+          const artifacts = p.artifacts.filter((a) => !okPaths.has(a.path));
+          return { ...p, artifacts, totalSize: artifacts.reduce((s, a) => s + a.size, 0) };
+        })
+        .filter((p) => p.artifacts.length > 0);
+    projects = prune(projects);
+    tools = prune(tools);
 
     for (const p of okPaths) selected.delete(p);
     cleanSummary = { freed, failed };
@@ -207,7 +233,7 @@
       <button class="btn primary" onclick={pickFolder} disabled={view === "scanning" || view === "cleaning"}>
         {rootPath ? "Change folder" : "Choose folder"}
       </button>
-      {#if rootPath && view === "results"}
+      {#if view === "results"}
         <button class="btn ghost" onclick={runScan}>↻ Rescan</button>
       {/if}
     </div>
@@ -236,9 +262,13 @@
         <p>
           Scan a folder to find the reinstallable dependencies and build
           artifacts of all your projects — Rust, Node.js, Python, Java, Go,
-          .NET, PHP, and many more.
+          .NET, PHP, and many more. Also finds JDKs, Android SDK components,
+          iOS simulators, emulators, toolchains and global package caches.
         </p>
-        <button class="btn primary big" onclick={pickFolder}>Choose a folder to scan</button>
+        <div class="hero-actions">
+          <button class="btn primary big" onclick={pickFolder}>Choose a folder to scan</button>
+          <button class="btn ghost big" onclick={runScan}>Scan SDKs & dev tools only</button>
+        </div>
       </div>
     </div>
 
@@ -265,7 +295,8 @@
       <div class="scanning">
         <div class="spinner"></div>
         <h2>Cleaning…</h2>
-        <div class="scan-count">{selected.size} target(s)</div>
+        <div class="scan-count">{progress?.scanned ?? 0} / {selected.size} deleted</div>
+        <div class="scan-path">{progress?.current ?? ""}</div>
       </div>
     </div>
 
@@ -280,8 +311,8 @@
         </div>
       </div>
       <div class="stat">
-        <div class="stat-val">{projects.length}</div>
-        <div class="stat-lbl">Projects</div>
+        <div class="stat-val">{projects.length + tools.length}</div>
+        <div class="stat-lbl">Projects & tool groups</div>
       </div>
       <div class="stat">
         <div class="stat-val">{totalArtifacts}</div>
@@ -293,7 +324,7 @@
       </div>
     </section>
 
-    {#if disk && projects.length > 0}
+    {#if disk && everything.length > 0}
       <section class="diskbar">
         <div class="diskbar-head">
           <span class="diskbar-title">
@@ -318,12 +349,12 @@
       </section>
     {/if}
 
-    {#if projects.length === 0}
+    {#if everything.length === 0}
       <div class="center">
         <div class="empty">
           <div class="empty-icon">✨</div>
           <h2>Nothing to clean</h2>
-          <p>No reinstallable artifacts found in this folder.</p>
+          <p>No reinstallable artifacts, SDKs or caches found.</p>
         </div>
       </div>
     {:else}
@@ -335,7 +366,7 @@
         </div>
 
         <div class="chips">
-          {#each ["dependencies", "build", "cache"] as kind}
+          {#each allKinds as kind}
             <button
               class="chip"
               class:on={activeKinds.has(kind)}
@@ -366,12 +397,23 @@
 
       <!-- List -->
       <div class="list">
-        {#if filtered.length === 0}
+        {#if filtered.length === 0 && filteredTools.length === 0}
           <div class="no-match">No project matches the filters.</div>
         {/if}
-        {#each filtered as project (project.path)}
-          <ProjectCard {project} {selected} />
-        {/each}
+        {#if filteredTools.length > 0}
+          <div class="section-title">SDKs, simulators & global tools</div>
+          {#each filteredTools as project (project.path)}
+            <ProjectCard {project} {selected} />
+          {/each}
+        {/if}
+        {#if filtered.length > 0}
+          {#if filteredTools.length > 0}
+            <div class="section-title">Projects</div>
+          {/if}
+          {#each filtered as project (project.path)}
+            <ProjectCard {project} {selected} />
+          {/each}
+        {/if}
       </div>
     {/if}
 
@@ -405,7 +447,9 @@
         </p>
         <p class="warn">
           These folders will be permanently deleted. They are regenerable
-          (reinstall the dependencies or rebuild the project).
+          (reinstall the dependencies, rebuild the project, or re-download
+          the SDK / simulator through its manager). Simulators are removed
+          via simctl; system-owned SDKs may ask for your admin password.
         </p>
         <div class="modal-actions">
           <button class="btn ghost" onclick={() => (showConfirm = false)}>Cancel</button>
@@ -545,6 +589,12 @@
     color: var(--text-dim);
     font-size: 15px;
     margin-bottom: 28px;
+  }
+  .hero-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
   }
 
   .scanning {
@@ -769,6 +819,14 @@
   }
 
   /* List */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-faint);
+    padding: 8px 2px 0;
+  }
   .list {
     flex: 1;
     overflow-y: auto;

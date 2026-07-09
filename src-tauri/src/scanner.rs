@@ -36,10 +36,10 @@ pub struct ProjectInfo {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct ScanProgress {
-    scanned: u64,
-    current: String,
-    phase: String,
+pub(crate) struct ScanProgress {
+    pub scanned: u64,
+    pub current: String,
+    pub phase: String,
 }
 
 /// An artifact directory discovered during the structural walk, before sizing.
@@ -222,7 +222,7 @@ fn is_hidden_skip(name: &str) -> bool {
 }
 
 /// Sum of file sizes under `path`, in bytes. Follows no symlinks.
-fn dir_size(path: &Path) -> u64 {
+pub(crate) fn dir_size(path: &Path) -> u64 {
     WalkDir::new(path)
         .follow_links(false)
         .into_iter()

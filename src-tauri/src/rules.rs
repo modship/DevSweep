@@ -10,6 +10,12 @@ pub enum Kind {
     Build,
     /// Tool caches (__pycache__, .pytest_cache, .gradle...)
     Cache,
+    /// Installed SDKs (JDKs, Android SDK components...)
+    Sdk,
+    /// Mobile simulators / emulators (iOS Simulator devices, Android AVDs)
+    Simulator,
+    /// Language toolchains installed by version managers (rustup, nvm, pyenv...)
+    Toolchain,
 }
 
 impl Kind {
@@ -18,6 +24,9 @@ impl Kind {
             Kind::Dependencies => "dependencies",
             Kind::Build => "build",
             Kind::Cache => "cache",
+            Kind::Sdk => "sdk",
+            Kind::Simulator => "simulator",
+            Kind::Toolchain => "toolchain",
         }
     }
 }

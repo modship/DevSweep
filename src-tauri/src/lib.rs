@@ -1,6 +1,7 @@
 mod cleaner;
 mod rules;
 mod scanner;
+mod tools;
 
 use std::path::{Path, PathBuf};
 
@@ -35,8 +36,15 @@ async fn scan_directory(app: AppHandle, path: String) -> Result<Vec<ProjectInfo>
 }
 
 #[tauri::command]
-async fn clean_paths(paths: Vec<String>) -> Result<Vec<CleanResult>, String> {
-    tauri::async_runtime::spawn_blocking(move || cleaner::clean(paths))
+async fn scan_tools(app: AppHandle) -> Result<Vec<ProjectInfo>, String> {
+    tauri::async_runtime::spawn_blocking(move || tools::scan(&app))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn clean_paths(app: AppHandle, paths: Vec<String>) -> Result<Vec<CleanResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || cleaner::clean(paths, &app))
         .await
         .map_err(|e| e.to_string())
 }
@@ -48,6 +56,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             scan_directory,
+            scan_tools,
             clean_paths,
             disk_usage
         ])

@@ -1,4 +1,10 @@
-export type ArtifactKind = "dependencies" | "build" | "cache";
+export type ArtifactKind =
+  | "dependencies"
+  | "build"
+  | "cache"
+  | "sdk"
+  | "simulator"
+  | "toolchain";
 
 export interface ArtifactInfo {
   path: string;
@@ -18,7 +24,7 @@ export interface ProjectInfo {
 export interface ScanProgress {
   scanned: number;
   current: string;
-  phase: "scanning" | "sizing";
+  phase: "scanning" | "sizing" | "cleaning";
 }
 
 export interface CleanResult {

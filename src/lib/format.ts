@@ -27,6 +27,11 @@ export function languageColor(language: string): string {
     "C / C++ (CMake)": "#649ad2",
     Zig: "#f7a41d",
     Haskell: "#5e5086",
+    Java: "#e76f00",
+    Android: "#3ddc84",
+    iOS: "#0a84ff",
+    Homebrew: "#f9d094",
+    asdf: "#9d7bd8",
   };
   return map[language] ?? "#7c8aa5";
 }
@@ -39,6 +44,12 @@ export function kindLabel(kind: ArtifactKind): string {
       return "Build";
     case "cache":
       return "Cache";
+    case "sdk":
+      return "SDK";
+    case "simulator":
+      return "Simulator";
+    case "toolchain":
+      return "Toolchain";
   }
 }
 
@@ -50,5 +61,11 @@ export function kindColor(kind: ArtifactKind): string {
       return "#fbbf24";
     case "cache":
       return "#a78bfa";
+    case "sdk":
+      return "#34d399";
+    case "simulator":
+      return "#f472b6";
+    case "toolchain":
+      return "#fb923c";
   }
 }
